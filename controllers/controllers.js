@@ -1,9 +1,10 @@
 const bcrypt = require("bcrypt");
-const adminModel = require("../model/adminModel");
-const postModel = require("../model/postModel");
 const jwt = require("jsonwebtoken");
 const { log } = require("console");
 const secretKey = "dhami_06";
+const userModel = require("../model/userModel");
+const categoryModel = require("../model/categoryModel");
+const productModel = require("../model/productModel");
 
 const login = (req, res) => {
   res.render("login");
@@ -14,11 +15,11 @@ const register = (req, res) => {
 };
 
 const defaultRoute = async (req, res) => {
-  const logIn = req.cookies;
+  const { jwt } = req.cookies;
 
-  if (logIn.jwt) {
+  if (jwt) {
     try {
-      res.render("index");
+      res.render("navbar");
     } catch (err) {
       console.log(err);
     }
@@ -27,24 +28,23 @@ const defaultRoute = async (req, res) => {
   }
 };
 
-const creatUser = async (req, res) => {
-  const { name, email, password, conf_password } = req.body;
-  const admin_data = await adminModel.findOne({ email });
+const createUser = async (req, res) => {
+  const { username, email, password, conf_password, role } = req.body;
+
   let saltRounds = 10;
   let enPass = await bcrypt.hash(password, saltRounds);
 
-  //   console.log("admin_data_email....", admin_data);
-
-  if (password === conf_password && admin_data === null) {
+  if (password === conf_password) {
     try {
-      const user = new adminModel({
-        name,
+      const user = new userModel({
+        username,
         email,
         password: enPass,
+        role,
       });
-      await user.save();
+      user.save();
 
-      const token = jwt.sign({ userId: user._id }, secretKey);
+      const token = jwt.sign({ data: user }, secretKey);
       res.cookie("jwt", token, { httpOnly: true });
 
       res.redirect("/login");
@@ -60,7 +60,7 @@ const creatUser = async (req, res) => {
 const userLogin = async (req, res) => {
   try {
     const { userEmail, userPassword } = req.body;
-    const user = await adminModel.findOne({ email: userEmail });
+    const user = await userModel.findOne({ email: userEmail });
 
     if (!user) {
       console.log("User not found. Create account...");
@@ -70,7 +70,7 @@ const userLogin = async (req, res) => {
 
       if (match) {
         console.log("Login successful");
-        const token = jwt.sign({ userId: user._id }, secretKey);
+        const token = jwt.sign({ data: user }, secretKey);
         res.cookie("jwt", token, { httpOnly: true });
         res.redirect("/");
       } else {
@@ -84,67 +84,151 @@ const userLogin = async (req, res) => {
   }
 };
 
-const createPost = (req, res) => {
-    console.log(req.body);
-  const { title, body, createdBy, active, latitude, longitude } = req.body;
-  const token = req.cookies.jwt;
-  const decoded = jwt.verify(token, secretKey);
-
-  const post = new postModel({
-    admin: decoded.userId,
-    title,
-    body,
-    createdBy,
-    active,
-    latitude,
-    longitude,
-  });
-  post.save();
-
+const logOut = (req, res) => {
+  res.clearCookie("jwt");
   res.redirect("/");
 };
 
-const viewpost = async (req, res) => {
+const addCategory = async (req, res) => {
+  const { category_name } = req.body;
+
+  const pro = new categoryModel({
+    category_name,
+  });
+  pro.save();
+  res.redirect("/categoryList");
+};
+
+const addCategory_page = (req, res) => {
+  res.render("addCategory");
+};
+const categoryList = async (req, res) => {
+  const list = await categoryModel.find();
+  res.render("categoryList", { list });
+};
+
+const editCategory = async (req, res) => {
+  const { id } = req.params;
+
+  const category = await categoryModel.findById(id);
+  res.render("editCategory", { category });
+};
+
+const updateCategory = async (req, res) => {
+  const { category_name, id } = req.body;
+
+  const updateCategory = await categoryModel.findByIdAndUpdate(id, {
+    category_name,
+  });
+
+  res.redirect("/categoryList");
+};
+
+const deleteCategory = async (req, res) => {
+  const { id } = req.params;
+
+  const category = await categoryModel.findByIdAndDelete(id);
+  res.redirect("/categoryList");
+};
+
+const pruduct_form = async (req, res) => {
+  const category = await categoryModel.find();
+  res.render("productForm", { category });
+};
+
+const addProduct = async (req, res) => {
+  const { admin_id, product_name, category, product_description } = req.body;
+  const category_obj = await categoryModel.findOne({ category_name: category });
+
   const token = req.cookies.jwt;
-  const decoded = jwt.verify(token, secretKey);
+  const decode = jwt.verify(token, secretKey);
 
-  const post = await postModel.find();
-  const posts = post.filter((p) => p.admin == decoded.userId);
-  res.json({ data: posts });
+  const product = new productModel({
+    admin_id: decode.data.id,
+    product_name,
+    category,
+    product_description,
+    category_id: category_obj.id,
+  });
+  product.save();
+
+  res.redirect("/viewProduct");
 };
 
-const updatepost =async (req, res) => {
-    const id = req.params.id;
-    const post =await postModel.findById(id);
-    console.log('post', post);
-    res.render('edit', {post})
-};
 
-const updatePost =async (req, res) => {
-    const {id, tital, body, createdBy, active, latitude, longitude,} = req.body
+const viewProduct =async (req, res) => {
+    const product = await productModel.find()
 
-    const post = await postModel.findByIdAndUpdate(id, {
-        tital, body, createdBy, active, latitude, longitude
+    const token = req.cookies.jwt;
+  const decode = jwt.verify(token, secretKey);
+
+    const products = product.filter((p) => {
+      return p.admin_id == decode.data.id
     })
-    res.redirect('/');
+    res.render('myProducts', {products})
+}
+
+
+const editProduct =async (req, res) => {
+  const {id} = req.params
+
+  const product =await productModel.findById(id)
+  const category = await categoryModel.find();
+  res.render('editProduct', {product, category})
 
 }
 
-const deletepost =async (req, res) => {
-    const id = req.params.id;
-    const post =await postModel.findByIdAndDelete(id);
-    res.json({data: post, ms: 'Delet Succesfull...'})
+
+const updateProduct =async (req, res) => {
+  const {id, product_name, category_id, category, product_description } = req.body;
+  const category_obj = await categoryModel.findOne({ category_name: category });
+
+  const pro=await productModel.findByIdAndUpdate(id, ({
+    product_name, category_id : category_obj.id, category, product_description 
+  }))
+  
+  res.redirect('/viewProduct')
 
 }
+
+
+const deleteProduct =async (req, res) => {
+  const {id} = req.params
+    const delete_product =await productModel.findByIdAndDelete(id)
+    res.redirect('/viewProduct')
+}
+
+
+const allProducts =async (req, res) => {
+  const products = await productModel.find()
+
+  res.render('allProducts', {products})
+}
+
+
+const navbar = (req, res) => {
+  res.render('navbar')
+}
+
 module.exports = {
   defaultRoute,
-  creatUser,
+  createUser,
   userLogin,
   login,
   register,
-  createPost,
-  viewpost,
-  updatepost,
-  updatePost,
-  deletepost
+  logOut,
+  categoryList,
+  addCategory,
+  addCategory_page,
+  editCategory,
+  updateCategory,
+  deleteCategory,
+  pruduct_form,
+  addProduct,
+  viewProduct,
+  editProduct,
+  updateProduct,
+  deleteProduct,
+  allProducts,
+  navbar
 };

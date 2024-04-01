@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+
+    <form action="/addProduct" method="post">
+        <input type="text" name="product_name" placeholder="product_name">
+        <select name="category">
+        <% category.forEach((c) => { %> 
+            <option value="<%= c.category_name %>"><%= c.category_name %></option>
+        <% }) %>
+        </select>
+        <br>
+        <br>
+        <div class="pro">
+            <textarea name="product_description" cols="30" rows="10">product_description</textarea>
+        </div>
+
+        <button type="submit">Add Product</button>
+    </form>
+    
+</body>
+</html>

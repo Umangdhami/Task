@@ -1,0 +1,1 @@
+E-commerce Platform Project Outline with JWT, Cookie, Role-Based Access, Multiuser Support, Populate, Navbar and MVC Pattern
